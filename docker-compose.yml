@@ -1,0 +1,47 @@
+version: '3'
+services:
+
+  db:
+    image: "postgres:9.6-alpine"
+    container_name: db
+    volumes:
+      - data:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_DB=read_bytes
+      - POSTGRES_USER=readbytes_admin
+      - POSTGRES_PASSWORD=mypass
+
+  api:
+    build: ./api
+    container_name: api
+    environment:
+      - DB_SERVER=db
+      - POSTGRES_DB=read_bytes
+      - POSTGRES_USER=readbytes_admin
+      - POSTGRES_PASSWORD=mypass
+      - OAUTH_CLIENT_ID=YOUR_OAUTH_CLIENT_ID
+    ports:
+      - 8081:8080
+    links:
+      - db
+    depends_on:
+    - db
+    command: sh -c "mvn clean flyway:migrate -Dflyway.configFiles=flywayConfig.properties && java -jar api.jar"
+
+  ui:
+    image: nginx:alpine
+    volumes:
+    - ./ui/:/usr/share/nginx/html/
+    container_name: ui
+    ports:
+    - 8080:80
+    links:
+    - api
+    depends_on:
+    - api
+
+
+volumes:
+  data:

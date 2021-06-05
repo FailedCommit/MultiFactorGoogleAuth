@@ -1,0 +1,89 @@
+<script src="https://apis.google.com/js/platform.js" async defer></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+<meta name="google-signin-client_id" content="OAUTH_CLIENT_ID">
+<div class="g-signin2" id="google-signin"></div>
+<input id="enable_2fa" type="checkbox" value="true"/> Enable 2FA
+<br/>
+<a href="#" onclick="signOut();">Sign out</a>
+<a href="#" onclick="revokeAllScopes();">Disconnect</a>
+
+<script>
+    /**
+     * The Sign-In client object.
+     */
+    let auth2;
+
+    let revokeAllScopes = function() {
+      gapi.auth2.getAuthInstance().disconnect();
+    }
+
+    /**
+     * Initializes the Sign-In client.
+     */
+    var initClient = function() {
+        gapi.load('auth2', function(){
+            /**
+             * Retrieve the singleton for the GoogleAuth library and set up the
+             * client.
+             */
+            auth2 = gapi.auth2.init({
+                client_id: 'OAUTH_CLIENT_ID'
+            });
+
+            // Attach the click handler to the sign-in button
+            auth2.attachClickHandler('google-signin', {}, onSignIn, onFailure);
+        });
+    };
+
+    /**
+     * Handle successful sign-ins.
+     */
+    function onSignIn(googleUser) {
+        const id_token = googleUser.getAuthResponse().id_token;
+        const enable_2fa = $('#enable_2fa').is(':checked');
+
+        $.ajax({
+            url: 'http://localhost:8081/v1/tokensignin',
+            type: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'application/json'
+            },
+            data: {
+                idToken: id_token
+            },
+            complete: function(data){
+                const userId = data.responseJSON.id;
+
+                if (enable_2fa) {
+                    $.ajax({
+                        url: `http://localhost:8081/v1/users/${userId}/2fa`,
+                        type: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'Accept': 'application/json',
+                            'Authorization': `Bearer ${data.responseJSON.sessionId}`
+                        },
+                        complete: function(data) {
+			    console.log(data);
+                        }
+                    });
+		}
+            }
+        });
+    }
+
+    /**
+     * Handle sign-in failures.
+     */
+    var onFailure = function(error) {
+        console.log(error);
+    };
+    window.onload = event => initClient();
+    function signOut() {
+        var auth2 = gapi.auth2.getAuthInstance();
+        auth2.signOut().then(function () {
+            console.log('User signed out.');
+        });
+    }
+</script>
